@@ -33,6 +33,19 @@ def _run_cli(args: list[str], timeout: int = 1800) -> str:
             timeout=timeout,
         )
         output = result.stdout
+
+        # --- 日志截断：防止 Agent 上下文爆炸 ---
+        # Agent 只需要看开头（确认执行了什么）和结尾（成功与否 + 统计）
+        MAX_OUTPUT_LEN = 3000
+        if len(output) > MAX_OUTPUT_LEN:
+            head_len = 500
+            tail_len = MAX_OUTPUT_LEN - head_len - 50  # 50 留给截断标记
+            output = (
+                output[:head_len]
+                + "\n\n... [中间日志已截断，保留首尾] ...\n\n"
+                + output[-tail_len:]
+            )
+
         if result.returncode == 0:
             return f"✅ 命令执行成功:\n\n{output}"
         else:
