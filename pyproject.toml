@@ -1,0 +1,41 @@
+[project]
+name = "quant-data-pipeline"
+version = "0.1.0"
+description = "Tushare A股数据管道 — 全量回填 / 每日增量 / 数据校验 / 告警通知"
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv>=1.0.1",
+    "sqlalchemy>=2.0.28",
+    "psycopg2-binary>=2.9.9",
+    "tushare>=1.2.9",
+    "tenacity>=8.2.3",
+    "pandas>=2.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "alembic>=1.13",
+    "ruff>=0.3",
+]
+migrations = [
+    "alembic>=1.13",
+]
+
+[project.scripts]
+quant-pipeline = "src.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
