@@ -28,7 +28,7 @@ origin: ECC
 manage_quant_data(action="status")
 ```
 
-返回每张表的最新数据日期和记录数。用于判断数据新鲜度。
+返回每张表的最新数据日期和记录数，附带**数据健康度摘要**（最新交易日、落后天数、覆盖范围）。用于判断数据新鲜度。
 
 ### 2. `daily_update` — 每日增量更新
 
@@ -60,7 +60,15 @@ manage_quant_data(action="sync_domain", domain="daily")
 | `trading` | top10_floatholders, margin, hk_hold |
 | `macro` | macro_indicators, index_dailybasic, sw_industry |
 
-### 4. `full_backfill` — 从零全量回填
+### 4. `backfill_gaps` — 自动检测并回补交易日断层
+
+```
+manage_quant_data(action="backfill_gaps")
+```
+
+自动检测 `daily` 表中缺失的交易日，逐日调用 Tushare API 回补。适用于发现历史数据断层时使用。
+
+### 5. `full_backfill` — 从零全量回填
 
 ```
 manage_quant_data(action="full_backfill")
@@ -71,7 +79,7 @@ manage_quant_data(action="full_backfill", skip_domains="basic")
 
 按 Phase 0→5 顺序串行执行全量回填，自动尊重表之间的外键依赖关系。
 
-### 5. `validate` — 数据质量校验
+### 6. `validate` — 数据质量校验
 
 ```
 manage_quant_data(action="validate")
@@ -124,4 +132,9 @@ daily_update → validate → status
 回测/分析前：
 ```
 status → (如数据落后) daily_update → status → (确认最新) → 执行回测
+```
+
+发现历史数据断层：
+```
+status → (发现 missing dates) → backfill_gaps → status → (确认数据完整)
 ```

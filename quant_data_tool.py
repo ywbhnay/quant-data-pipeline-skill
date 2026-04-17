@@ -68,6 +68,7 @@ def manage_quant_data(
         "daily_update"     — 执行每日增量更新，同步到最新交易日
         "sync_domain"      — 单独同步某个业务域 (需指定 domain 参数)
         "full_backfill"    — 从零全量回填所有业务域
+        "backfill_gaps"    — 自动检测并回补 daily 表中的交易日断层
         "validate"         — 运行数据质量校验
     - domain (str, optional): 当 action="sync_domain" 时必填。
         可选值: basic, daily, finance, finance-aux, trading, macro
@@ -99,6 +100,8 @@ def manage_quant_data(
             args.extend(["--skip", skip_domains])
         if verbose:
             args.append("-v")
+    elif action == "backfill_gaps":
+        args.append("backfill-gaps")
     elif action == "validate":
         args.append("validate")
         if domain:
@@ -106,7 +109,7 @@ def manage_quant_data(
     else:
         return (
             f"错误: 未知的 action '{action}'\n"
-            "可用 action: status, daily_update, sync_domain, full_backfill, validate"
+            "可用 action: status, daily_update, sync_domain, full_backfill, backfill_gaps, validate"
         )
 
     return _run_cli(args)

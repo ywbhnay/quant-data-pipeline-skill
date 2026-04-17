@@ -130,6 +130,9 @@ def cmd_status(args: argparse.Namespace) -> None:
         ("margin", "trade_date"),
     ]
 
+    today = datetime.now().strftime("%Y%m%d")
+    latest_trade_date = None
+
     with engine.connect() as conn:
         print(f"{'Table':<25} {'Latest Date':<15} {'Count':>12}")
         print("-" * 55)
@@ -143,8 +146,46 @@ def cmd_status(args: argparse.Namespace) -> None:
                 latest = str(row[0]) if row and row[0] else "(empty)"
                 count = row[1] if row and row[1] else 0
                 print(f"{table:<25} {latest:<15} {count:>12,}")
+                if table == "daily" and row and row[0]:
+                    latest_trade_date = str(row[0])
             except Exception as e:
                 print(f"{table:<25} {'ERROR':<15} {e}")
+
+    # --- 数据健康度摘要 ---
+    print("")
+    print("=" * 55)
+    print("  数据健康度摘要")
+    print("=" * 55)
+
+    if latest_trade_date:
+        days_behind = (
+            int(today) - int(latest_trade_date)
+            if int(today) >= int(latest_trade_date)
+            else 0
+        )
+        status = "最新" if days_behind <= 3 else f"落后 {days_behind} 天"
+        print(f"  daily 最新交易日: {latest_trade_date}  (今日 {today}, {status})")
+    else:
+        print("  daily 表为空，需要执行 full_backfill 或 daily_update")
+
+    # 交易日总数统计
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT COUNT(DISTINCT trade_date), "
+                    "MIN(trade_date), MAX(trade_date) FROM daily"
+                )
+            ).fetchone()
+            if row and row[0]:
+                print(
+                    f"  daily 覆盖范围: {row[1]} ~ {row[2]}, "
+                    f"共 {row[0]:,} 个独立交易日"
+                )
+    except Exception:
+        pass
+
+    print("")
 
 
 def cmd_full_backfill(args: argparse.Namespace) -> None:
@@ -265,6 +306,30 @@ def cmd_sync(args: argparse.Namespace) -> None:
         session.commit()
 
     logger.info("[sync] 域 %s 同步完成", args.domain)
+
+
+def cmd_backfill_gaps(args: argparse.Namespace) -> None:
+    """自动检测并回补 daily 表中的交易日断层。"""
+    engine, pro, rate_limiter, notifier, _sync_cfg, token = _init_infra()
+
+    from .sync.backfill_gaps import BackfillGapsSyncer
+
+    syncer = BackfillGapsSyncer(engine, pro, rate_limiter, token)
+
+    with get_session(engine) as session:
+        result = syncer.backfill_gaps(session)
+
+    if result["total_missing"] == 0:
+        logger.info("[backfill_gaps] 数据完整，无需回补")
+    else:
+        logger.info(
+            "[backfill_gaps] 回补完成: 缺失 %d 个日期, "
+            "成功 %d, 失败 %d, 插入 %d 条",
+            result["total_missing"],
+            result["success"],
+            result["failed"],
+            result["total_inserted"],
+        )
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -388,6 +453,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="校验指定域 (默认全部)",
     )
 
+    # --- backfill-gaps ---
+    sub.add_parser(
+        "backfill-gaps",
+        help="自动检测并回补 daily 表中的交易日断层",
+    )
+
     return parser
 
 
@@ -408,6 +479,7 @@ def main() -> None:
         "status": cmd_status,
         "sync": cmd_sync,
         "validate": cmd_validate,
+        "backfill-gaps": cmd_backfill_gaps,
     }
 
     cmd = commands[args.command]
